@@ -1,0 +1,142 @@
+body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        /* ===== NAVBAR ===== */
+        .main-header {
+            background: #ffffff;
+            height: 60px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            position: fixed;
+            width: 100%;
+            z-index: 1000;
+        }
+
+        .main-header h5 {
+            margin: 0;
+            font-weight: 600;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .main-sidebar {
+            position: fixed;
+            top: 60px;
+            left: 0;
+            height: 100%;
+            width: 230px;
+            background: #343a40;
+            padding-top: 20px;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+        }
+
+        .sidebar-menu li {
+            padding: 12px 20px;
+        }
+
+        .sidebar-menu li a {
+            color: #c2c7d0;
+            text-decoration: none;
+            display: block;
+        }
+
+        .sidebar-menu li a:hover {
+            background: #495057;
+            border-radius: 4px;
+            color: #ffffff;
+        }
+
+        .sidebar-menu .active {
+            background: #007bff;
+            border-radius: 4px;
+        }
+
+        /* ===== CONTENT ===== */
+        .content-wrapper {
+            padding: 25px;
+        }
+
+        .card {
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.05);
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .table thead {
+            background-color: #343a40;
+            color: white;
+        }
+
+        .btn {
+            border-radius: 4px;
+        }
+/* ===== RESPONSIVE MOBILE ===== */
+
+@media (max-width: 991px) {
+
+    .main-sidebar {
+        left: -230px;
+        transition: 0.3s;
+    }
+
+    .main-sidebar.active {
+        left: 0;
+    }
+
+    .content-wrapper {
+        margin-left: 0;
+        padding: 15px;
+    }
+
+    .main-header {
+        padding: 0 15px;
+    }
+
+    .sidebar-toggle {
+        display: block;
+        font-size: 20px;
+        cursor: pointer;
+        margin-right: 15px;
+    }
+
+}
+
+/* Desktop */
+@media (min-width: 992px) {
+
+    .sidebar-toggle {
+        display: none;
+    }
+
+}
+
+/* Overlay ketika sidebar aktif di mobile */
+.overlay {
+    display: none;
+}
+
+.overlay.active {
+    display: block;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.4);
+    top: 60px;
+    left: 0;
+    z-index: 999;
+}
