@@ -388,9 +388,31 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="table-responsive">
+                                                <div id="uploadProposalBox" style="display:none; margin-bottom:24px;">
+                                                    <form id="uploadProposalForm" enctype="multipart/form-data" class="mb-3">
+                                                        <div class="form-row align-items-end">
+                                                            <div class="form-group col-md-3">
+                                                                <label for="proposalTitle">Judul</label>
+                                                                <input type="text" class="form-control" id="proposalTitle" name="title" maxlength="255">
+                                                            </div>
+                                                            <div class="form-group col-md-4">
+                                                                <label for="proposalDescription">Deskripsi</label>
+                                                                <input type="text" class="form-control" id="proposalDescription" name="description">
+                                                            </div>
+                                                            <div class="form-group col-md-3">
+                                                                <label for="proposalFile">File Proposal (PDF)</label>
+                                                                <input type="file" class="form-control-file" id="proposalFile" name="file" accept="application/pdf" required>
+                                                            </div>
+                                                            <div class="form-group col-md-2">
+                                                                <button type="submit" class="btn btn-primary btn-block">Upload Proposal</button>
+                                                            </div>
+                                                        </div>
+                                                        <div id="uploadProposalMsg" class="mt-2"></div>
+                                                    </form>
+                                                </div>
                                         <table class="table table-bordered table-striped table-hover align-middle" id="proposalTable" style="min-width:1100px;">
                                             <thead class="thead-dark">
-                                                <tr>
+                                                <tr id="proposalTableHeaderRow">
                                                     <th style="width:40px;">ID</th>
                                                     <th style="width:180px;">Judul</th>
                                                     <th style="width:260px;">Deskripsi</th>
@@ -399,7 +421,7 @@
                                                     <th style="width:120px;">Reviewer</th>
                                                     <th style="width:110px;">Tanggal</th>
                                                     <th style="width:90px;">Berkas</th>
-                                                            <th style="width:120px;">Aksi</th>
+                                                    <th style="width:120px; display:none;" id="aksiHeader">Aksi</th>
                                                 </tr>
                                             </thead>
                                             <tbody style="font-size: 0.97rem;">
@@ -490,6 +512,62 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', function () {
+        let isDosen = false;
+        // Cek role user, jika dosen tampilkan form upload dan sembunyikan kolom aksi
+        fetch('/api/user', {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match('XSRF-TOKEN=([^;]+)')?.[1] || '')
+            },
+            credentials: 'same-origin'
+        })
+        .then(res => res.json())
+        .then(user => {
+            if (user && user.role && user.role.name === 'dosen') {
+                isDosen = true;
+                document.getElementById('uploadProposalBox').style.display = '';
+                document.getElementById('aksiHeader').style.display = 'none';
+            } else {
+                isDosen = false;
+                document.getElementById('aksiHeader').style.display = '';
+            }
+            loadProposals();
+        });
+
+        // Handle upload proposal
+        const uploadForm = document.getElementById('uploadProposalForm');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(uploadForm);
+                const msg = document.getElementById('uploadProposalMsg');
+                msg.innerHTML = '';
+                fetch('/api/proposals', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match('XSRF-TOKEN=([^;]+)')?.[1] || '')
+                    },
+                    credentials: 'same-origin',
+                    body: formData
+                })
+                .then(async res => {
+                    if (res.ok) {
+                        msg.innerHTML = '<span class="text-success">Upload berhasil!</span>';
+                        uploadForm.reset();
+                        loadProposals();
+                    } else {
+                        const data = await res.json();
+                        msg.innerHTML = '<span class="text-danger">Gagal upload: ' + (data.message || 'Terjadi kesalahan') + '</span>';
+                    }
+                })
+                .catch(() => {
+                    msg.innerHTML = '<span class="text-danger">Gagal upload: Terjadi kesalahan koneksi</span>';
+                });
+            });
+        }
         function statusBadge(status) {
             if (status === 'approved') return '<span class="badge badge-success">Approved</span>';
             if (status === 'declined') return '<span class="badge badge-danger">Declined</span>';
@@ -521,34 +599,36 @@
                             <td>${p.reviewer ? p.reviewer.name : '-'}</td>
                             <td>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</td>
                             <td>${p.file_url ? `<a href=\"${p.file_url}\" target=\"_blank\">Download</a>` : '-'}</td>
-                            <td>
+                            ${!isDosen ? `<td>
                                 ${p.status === 'waiting' ? `
                                     <button class='btn btn-success btn-sm accept-btn' data-id='${p.id}'>Accept</button>
                                     <button class='btn btn-danger btn-sm decline-btn' data-id='${p.id}'>Decline</button>
                                 ` : ''}
-                            </td>
+                            </td>` : ''}
                         `;
                         tbody.appendChild(tr);
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="9" class="text-center">Tidak ada data proposal</td></tr>';
+                    tbody.innerHTML = `<tr><td colspan="${isDosen ? '8' : '9'}" class="text-center">Tidak ada data proposal</td></tr>`;
                 }
 
-                // Event listener untuk tombol Accept/Decline
-                tbody.querySelectorAll('.accept-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        updateStatus(this.dataset.id, 'approved');
+                if (!isDosen) {
+                    // Event listener untuk tombol Accept/Decline
+                    tbody.querySelectorAll('.accept-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            updateStatus(this.dataset.id, 'approved');
+                        });
                     });
-                });
-                tbody.querySelectorAll('.decline-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        updateStatus(this.dataset.id, 'declined');
+                    tbody.querySelectorAll('.decline-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            updateStatus(this.dataset.id, 'declined');
+                        });
                     });
-                });
+                }
             })
             .catch(() => {
                 const tbody = document.querySelector('#proposalTable tbody');
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center">Gagal memuat data proposal</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="${isDosen ? '8' : '9'}" class="text-center">Gagal memuat data proposal</td></tr>`;
             });
         }
 
