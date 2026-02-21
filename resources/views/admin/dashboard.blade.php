@@ -8,6 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="description" content="">
     <meta name="author" content="">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>LPPM ISTEK WIDURI - Dashboard</title>
 
@@ -378,6 +379,52 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Tabel Proposal -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card shadow mb-4">
+                                <div class="card-header py-3">
+                                    <h6 class="m-0 font-weight-bold text-primary">Daftar Proposal</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped table-hover align-middle" id="proposalTable" style="min-width:1100px;">
+                                            <thead class="thead-dark">
+                                                <tr>
+                                                    <th style="width:40px;">ID</th>
+                                                    <th style="width:180px;">Judul</th>
+                                                    <th style="width:260px;">Deskripsi</th>
+                                                    <th style="width:90px;">Status</th>
+                                                    <th style="width:120px;">Pengusul</th>
+                                                    <th style="width:120px;">Reviewer</th>
+                                                    <th style="width:110px;">Tanggal</th>
+                                                    <th style="width:90px;">Berkas</th>
+                                                            <th style="width:120px;">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody style="font-size: 0.97rem;">
+                                                <!-- Data akan diisi oleh JavaScript -->
+                                            </tbody>
+                                        </table>
+                                        <style>
+                                            #proposalTable th, #proposalTable td {
+                                                vertical-align: middle !important;
+                                                white-space: nowrap;
+                                                text-overflow: ellipsis;
+                                                overflow: hidden;
+                                            }
+                                            #proposalTable td {
+                                                max-width: 220px;
+                                            }
+                                            @media (max-width: 1200px) {
+                                                #proposalTable { font-size: 0.92rem; }
+                                            }
+                                        </style>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
             </div>
             <!-- End of Main Content -->
 
@@ -440,6 +487,90 @@
     <!-- Page level custom scripts -->
     <script src="{{ asset('js/demo/chart-area-demo.js') }}"></script>
     <script src="{{ asset('js/demo/chart-pie-demo.js') }}"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        function statusBadge(status) {
+            if (status === 'approved') return '<span class="badge badge-success">Approved</span>';
+            if (status === 'declined') return '<span class="badge badge-danger">Declined</span>';
+            return '<span class="badge badge-primary">Waiting</span>';
+        }
+
+        function loadProposals() {
+            fetch('/api/proposals', {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match('XSRF-TOKEN=([^;]+)')?.[1] || '')
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(json => {
+                const tbody = document.querySelector('#proposalTable tbody');
+                tbody.innerHTML = '';
+                if (json.data && Array.isArray(json.data)) {
+                    json.data.forEach(p => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${p.id}</td>
+                            <td>${p.title || ''}</td>
+                            <td>${p.description || ''}</td>
+                            <td>${statusBadge(p.status)}</td>
+                            <td>${p.user ? p.user.name : ''}</td>
+                            <td>${p.reviewer ? p.reviewer.name : '-'}</td>
+                            <td>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</td>
+                            <td>${p.file_url ? `<a href=\"${p.file_url}\" target=\"_blank\">Download</a>` : '-'}</td>
+                            <td>
+                                ${p.status === 'waiting' ? `
+                                    <button class='btn btn-success btn-sm accept-btn' data-id='${p.id}'>Accept</button>
+                                    <button class='btn btn-danger btn-sm decline-btn' data-id='${p.id}'>Decline</button>
+                                ` : ''}
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center">Tidak ada data proposal</td></tr>';
+                }
+
+                // Event listener untuk tombol Accept/Decline
+                tbody.querySelectorAll('.accept-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        updateStatus(this.dataset.id, 'approved');
+                    });
+                });
+                tbody.querySelectorAll('.decline-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        updateStatus(this.dataset.id, 'declined');
+                    });
+                });
+            })
+            .catch(() => {
+                const tbody = document.querySelector('#proposalTable tbody');
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center">Gagal memuat data proposal</td></tr>';
+            });
+        }
+
+        function updateStatus(id, status) {
+            fetch(`/api/proposals/${id}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match('XSRF-TOKEN=([^;]+)')?.[1] || '')
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ status })
+            })
+            .then(res => res.json())
+            .then(() => loadProposals());
+        }
+
+        loadProposals();
+    });
+    </script>
 
 </body>
 
