@@ -388,6 +388,33 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="table-responsive">
+                                                        <!-- Modal Upload Surat Tugas -->
+                                                        <div class="modal fade" id="modalSuratTugas" tabindex="-1" role="dialog" aria-labelledby="modalSuratTugasLabel" aria-hidden="true">
+                                                            <div class="modal-dialog" role="document">
+                                                                <div class="modal-content">
+                                                                    <form id="uploadSuratTugasForm" enctype="multipart/form-data">
+                                                                        <div class="modal-header">
+                                                                            <h5 class="modal-title" id="modalSuratTugasLabel">Upload Surat Tugas Penelitian</h5>
+                                                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                                                <span aria-hidden="true">&times;</span>
+                                                                            </button>
+                                                                        </div>
+                                                                        <div class="modal-body">
+                                                                            <input type="hidden" id="suratTugasProposalId" name="proposal_id">
+                                                                            <div class="form-group">
+                                                                                <label for="suratTugasFile">File Surat Tugas (PDF)</label>
+                                                                                <input type="file" class="form-control-file" id="suratTugasFile" name="file" accept="application/pdf" required>
+                                                                            </div>
+                                                                            <div id="uploadSuratTugasMsg" class="mt-2"></div>
+                                                                        </div>
+                                                                        <div class="modal-footer">
+                                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                                                                            <button type="submit" class="btn btn-primary">Upload Surat Tugas</button>
+                                                                        </div>
+                                                                    </form>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                 <div id="uploadProposalBox" style="display:none; margin-bottom:24px;">
                                                     <form id="uploadProposalForm" enctype="multipart/form-data" class="mb-3">
                                                         <div class="form-row align-items-end">
@@ -513,6 +540,7 @@
     <script>
     document.addEventListener('DOMContentLoaded', function () {
         let isDosen = false;
+        let isKepalaLppm = false;
         // Cek role user, jika dosen tampilkan form upload dan sembunyikan kolom aksi
         fetch('/api/user', {
             headers: {
@@ -524,13 +552,18 @@
         })
         .then(res => res.json())
         .then(user => {
-            if (user && user.role && user.role.name === 'dosen') {
-                isDosen = true;
-                document.getElementById('uploadProposalBox').style.display = '';
-                document.getElementById('aksiHeader').style.display = 'none';
-            } else {
-                isDosen = false;
-                document.getElementById('aksiHeader').style.display = '';
+            if (user && user.role) {
+                if (user.role.name === 'dosen') {
+                    isDosen = true;
+                    document.getElementById('uploadProposalBox').style.display = '';
+                    document.getElementById('aksiHeader').style.display = 'none';
+                } else {
+                    isDosen = false;
+                    document.getElementById('aksiHeader').style.display = '';
+                }
+                if (user.role.name === 'kepala_lppm') {
+                    isKepalaLppm = true;
+                }
             }
             loadProposals();
         });
@@ -571,6 +604,7 @@
         function statusBadge(status) {
             if (status === 'approved') return '<span class="badge badge-success">Approved</span>';
             if (status === 'declined') return '<span class="badge badge-danger">Declined</span>';
+            if (status === 'assigned') return '<span class="badge badge-info">Surat Tugas</span>';
             return '<span class="badge badge-primary">Waiting</span>';
         }
 
@@ -590,6 +624,17 @@
                 if (json.data && Array.isArray(json.data)) {
                     json.data.forEach(p => {
                         const tr = document.createElement('tr');
+                        let aksiHtml = '';
+                        if (!isDosen) {
+                            if (p.status === 'waiting') {
+                                aksiHtml = `
+                                    <button class='btn btn-success btn-sm accept-btn' data-id='${p.id}'>Accept</button>
+                                    <button class='btn btn-danger btn-sm decline-btn' data-id='${p.id}'>Decline</button>
+                                `;
+                            } else if (isKepalaLppm && p.status === 'approved') {
+                                aksiHtml = `<button class='btn btn-info btn-sm surat-tugas-btn' data-id='${p.id}'>Kirim Surat Tugas</button>`;
+                            }
+                        }
                         tr.innerHTML = `
                             <td>${p.id}</td>
                             <td>${p.title || ''}</td>
@@ -599,12 +644,7 @@
                             <td>${p.reviewer ? p.reviewer.name : '-'}</td>
                             <td>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</td>
                             <td>${p.file_url ? `<a href=\"${p.file_url}\" target=\"_blank\">Download</a>` : '-'}</td>
-                            ${!isDosen ? `<td>
-                                ${p.status === 'waiting' ? `
-                                    <button class='btn btn-success btn-sm accept-btn' data-id='${p.id}'>Accept</button>
-                                    <button class='btn btn-danger btn-sm decline-btn' data-id='${p.id}'>Decline</button>
-                                ` : ''}
-                            </td>` : ''}
+                            ${!isDosen ? `<td>${aksiHtml}</td>` : ''}
                         `;
                         tbody.appendChild(tr);
                     });
@@ -624,6 +664,50 @@
                             updateStatus(this.dataset.id, 'declined');
                         });
                     });
+                    // Event listener untuk tombol Surat Tugas
+                    tbody.querySelectorAll('.surat-tugas-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            // Bawa id proposal ke modal
+                            document.getElementById('suratTugasProposalId').value = this.dataset.id;
+                            document.getElementById('suratTugasFile').value = '';
+                            document.getElementById('uploadSuratTugasMsg').innerHTML = '';
+                            $('#modalSuratTugas').modal('show');
+                        });
+                    });
+                        // Handle upload surat tugas
+                        const suratTugasForm = document.getElementById('uploadSuratTugasForm');
+                        if (suratTugasForm) {
+                            suratTugasForm.addEventListener('submit', function(e) {
+                                e.preventDefault();
+                                const proposalId = document.getElementById('suratTugasProposalId').value;
+                                const formData = new FormData(suratTugasForm);
+                                const msg = document.getElementById('uploadSuratTugasMsg');
+                                msg.innerHTML = '';
+                                fetch(`/api/proposals/${proposalId}/assignment-letter`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Accept': 'application/json',
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                        'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match('XSRF-TOKEN=([^;]+)')?.[1] || '')
+                                    },
+                                    credentials: 'same-origin',
+                                    body: formData
+                                })
+                                .then(async res => {
+                                    if (res.ok) {
+                                        msg.innerHTML = '<span class="text-success">Surat tugas berhasil diupload!</span>';
+                                        suratTugasForm.reset();
+                                        setTimeout(() => { $('#modalSuratTugas').modal('hide'); loadProposals(); }, 1200);
+                                    } else {
+                                        const data = await res.json();
+                                        msg.innerHTML = '<span class="text-danger">Gagal upload: ' + (data.message || 'Terjadi kesalahan') + '</span>';
+                                    }
+                                })
+                                .catch(() => {
+                                    msg.innerHTML = '<span class="text-danger">Gagal upload: Terjadi kesalahan koneksi</span>';
+                                });
+                            });
+                        }
                 }
             })
             .catch(() => {
